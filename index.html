@@ -7,7 +7,7 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 800px;
+            max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
             background-color: #0a0a0a;
@@ -131,49 +131,117 @@
             font-size: 12px;
         }
         
-        .pulsex-position {
+        .transaction-item {
             background-color: #1a1a2e;
             border-radius: 8px;
             padding: 15px;
             margin: 10px 0;
-            border-left: 3px solid #ff6b6b;
+            border-left: 4px solid #9b59b6;
+            transition: all 0.3s ease;
         }
         
-        .position-header {
+        .transaction-item:hover {
+            background-color: #252544;
+            transform: translateY(-2px);
+        }
+        
+        .tx-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 10px;
         }
         
-        .pair-name {
+        .tx-type {
             font-weight: bold;
-            color: #ff6b6b;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
         }
         
-        .position-value {
-            color: #00ff88;
+        .tx-sent {
+            background-color: #ff4444;
+            color: white;
+        }
+        
+        .tx-received {
+            background-color: #44ff44;
+            color: black;
+        }
+        
+        .tx-contract {
+            background-color: #ffaa44;
+            color: black;
+        }
+        
+        .tx-amount {
+            font-size: 18px;
             font-weight: bold;
         }
         
-        .transaction-item {
-            background-color: #1a1a2e;
-            border-radius: 8px;
-            padding: 12px;
-            margin: 8px 0;
-            border-left: 3px solid #9b59b6;
+        .tx-sent .tx-amount {
+            color: #ff6666;
+        }
+        
+        .tx-received .tx-amount {
+            color: #66ff66;
+        }
+        
+        .tx-details {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #ccc;
         }
         
         .tx-hash {
             font-family: monospace;
             font-size: 12px;
-            color: #999;
+            color: #00d4ff;
+            cursor: pointer;
+            text-decoration: underline;
             word-break: break-all;
         }
         
-        .tx-type {
-            color: #9b59b6;
-            font-weight: bold;
+        .tx-hash:hover {
+            color: #66ffff;
+        }
+        
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 20px 0;
+            gap: 10px;
+        }
+        
+        .pagination button {
+            padding: 8px 16px;
+            margin: 0;
+            font-size: 14px;
+        }
+        
+        .page-info {
+            color: #ccc;
+            margin: 0 15px;
+        }
+        
+        .filter-controls {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+        
+        .filter-btn {
+            padding: 8px 16px;
+            font-size: 14px;
+            margin: 0;
+            opacity: 0.7;
+        }
+        
+        .filter-btn.active {
+            opacity: 1;
+            background: linear-gradient(45deg, #9b59b6, #8e44ad);
         }
         
         .modal {
@@ -215,7 +283,7 @@
                 padding: 15px;
             }
             
-            .token-item {
+            .token-item, .tx-header {
                 flex-direction: column;
                 align-items: flex-start;
             }
@@ -223,6 +291,10 @@
             .token-balance {
                 text-align: left;
                 margin-top: 5px;
+            }
+            
+            .filter-controls {
+                justify-content: center;
             }
         }
     </style>
@@ -233,20 +305,7 @@
         
         <div id="status" class="status disconnected">
             Not Connected to PulseChain
-            <div id="exportModal" class="modal">
-            <div class="modal-content">
-                <span class="close" onclick="closeModal()">&times;</span>
-                <h2>📄 Portfolio Summary</h2>
-                <div id="exportContent">
-                    <!-- Export content will be generated here -->
-                </div>
-                <div style="text-align: center; margin-top: 20px;">
-                    <button onclick="copyToClipboard()">📋 Copy to Clipboard</button>
-                    <button onclick="downloadPDF()">📥 Download PDF</button>
-                </div>
-            </div>
         </div>
-    </div>
         
         <div style="text-align: center;">
             <button id="connectBtn" onclick="connectWallet()">Connect PulseChain Wallet</button>
@@ -262,6 +321,12 @@
                 🔍 Analyze This Wallet
             </button>
         </div>
+        
+        <div id="loading" class="loading" style="display: none;">
+            <p>⏳ Connecting to wallet...</p>
+        </div>
+        
+        <div id="error" class="error" style="display: none;"></div>
         
         <div id="walletInfo" style="display: none;">
             <div class="wallet-info">
@@ -313,16 +378,23 @@
             </div>
             
             <div class="wallet-info">
-                <h3>🔄 PulseX Positions</h3>
-                <div id="pulsexPositions">
-                    <div class="loading">Loading PulseX data...</div>
+                <h3>📈 Transaction History (Last 100)</h3>
+                
+                <div class="filter-controls">
+                    <button class="filter-btn active" onclick="filterTransactions('all')">All</button>
+                    <button class="filter-btn" onclick="filterTransactions('sent')">📤 Sent</button>
+                    <button class="filter-btn" onclick="filterTransactions('received')">📥 Received</button>
+                    <button class="filter-btn" onclick="filterTransactions('contract')">🔄 Contracts</button>
                 </div>
-            </div>
-            
-            <div class="wallet-info">
-                <h3>📈 Recent Activity</h3>
-                <div id="recentActivity">
-                    <div class="loading">Loading recent transactions...</div>
+                
+                <div id="transactionHistory">
+                    <div class="loading">Loading transaction history...</div>
+                </div>
+                
+                <div class="pagination" id="txPagination" style="display: none;">
+                    <button onclick="changePage(-1)">← Previous</button>
+                    <span class="page-info" id="pageInfo">Page 1 of 1</span>
+                    <button onclick="changePage(1)">Next →</button>
                 </div>
             </div>
             
@@ -339,20 +411,28 @@
             </div>
         </div>
         
-        <div id="loading" class="loading" style="display: none;">
-            <p>⏳ Connecting to wallet...</p>
-        </div>
-        
-        <div id="error" class="error" style="display: none;"></div>
-        
         <div style="margin-top: 30px; padding: 20px; background-color: #2a2a3e; border-radius: 8px;">
             <h3>📋 Test Instructions:</h3>
             <ol>
                 <li><strong>Option 1:</strong> Install MetaMask, add PulseChain network, and click "Connect PulseChain Wallet"</li>
                 <li><strong>Option 2:</strong> Just paste any PulseChain wallet address above and click "Analyze This Wallet"</li>
-                <li>View complete portfolio including tokens, PulseX positions, and transaction history</li>
+                <li>View complete portfolio including tokens, transaction history, and blockchain data</li>
                 <li>Export or share the results</li>
             </ol>
+        </div>
+        
+        <div id="exportModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeModal()">&times;</span>
+                <h2>📄 Portfolio Summary</h2>
+                <div id="exportContent">
+                    <!-- Export content will be generated here -->
+                </div>
+                <div style="text-align: center; margin-top: 20px;">
+                    <button onclick="copyToClipboard()">📋 Copy to Clipboard</button>
+                    <button onclick="downloadPDF()">📥 Download PDF</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -379,7 +459,7 @@
         // Multiple data sources for verification
         const DATA_SOURCES = {
             rpc1: 'https://rpc.pulsechain.com',
-            rpc2: 'https://rpc-testnet.pulsechain.com', // Backup RPC
+            rpc2: 'https://rpc-testnet.pulsechain.com',
             explorer: 'https://api.scan.pulsechain.com/api'
         };
         
@@ -402,26 +482,16 @@
                 symbol: 'WPLS',
                 address: '0xA1077a294dDE1B09bB078844df40758a5D0f9a27',
                 decimals: 18
-            },
-            {
-                name: 'Phiat',
-                symbol: 'PHIAT',
-                address: '0x5b4A7C0db5e08e0c8E6D8A63C2d4e2E7A2a2E8B9',
-                decimals: 18
             }
         ];
-        
-        // PulseX Factory and Router addresses
-        const PULSEX_ADDRESSES = {
-            factory: '0x1715a3E4A142d8b698131108995174F37aEBA10D',
-            router: '0x165C3410fC91EF562C50559f7d2289fEbed552d9'
-        };
         
         let portfolioData = {
             tokens: [],
             totalValue: 0,
-            pulsexPositions: [],
-            recentTransactions: []
+            transactions: [],
+            currentPage: 1,
+            itemsPerPage: 10,
+            currentFilter: 'all'
         };
         
         async function connectWallet() {
@@ -429,9 +499,7 @@
             hideError();
             
             try {
-                // Check if MetaMask is installed
                 if (typeof window.ethereum !== 'undefined') {
-                    // Request account access
                     const accounts = await window.ethereum.request({
                         method: 'eth_requestAccounts'
                     });
@@ -439,14 +507,12 @@
                     if (accounts.length > 0) {
                         userAccount = accounts[0];
                         
-                        // Try to switch to PulseChain network
                         try {
                             await window.ethereum.request({
                                 method: 'wallet_switchEthereumChain',
                                 params: [{ chainId: PULSECHAIN_CONFIG.chainId }]
                             });
                         } catch (switchError) {
-                            // If network doesn't exist, add it
                             if (switchError.code === 4902) {
                                 await window.ethereum.request({
                                     method: 'wallet_addEthereumChain',
@@ -457,13 +523,10 @@
                             }
                         }
                         
-                        // Initialize Web3
                         web3 = new Web3(window.ethereum);
-                        
-                        // Get network info
                         const chainId = await web3.eth.getChainId();
                         
-                        if (chainId === 369) { // PulseChain mainnet
+                        if (chainId === 369) {
                             await updateWalletInfo();
                             showConnected();
                         } else {
@@ -481,25 +544,52 @@
             showLoading(false);
         }
         
+        async function analyzeWallet() {
+            const inputAddress = document.getElementById('walletInput').value.trim();
+            
+            if (!inputAddress) {
+                showError('Please enter a wallet address');
+                return;
+            }
+            
+            if (!inputAddress.startsWith('0x') || inputAddress.length !== 42) {
+                showError('Please enter a valid wallet address (starts with 0x, 42 characters)');
+                return;
+            }
+            
+            showLoading(true);
+            hideError();
+            
+            try {
+                web3 = new Web3('https://rpc.pulsechain.com');
+                userAccount = inputAddress;
+                
+                await updateWalletInfo();
+                showAnalyzed();
+                
+            } catch (error) {
+                console.error('Analysis error:', error);
+                showError('Failed to analyze wallet: ' + error.message);
+            }
+            
+            showLoading(false);
+        }
+        
         async function updateWalletInfo() {
             try {
-                // Update basic info
                 document.getElementById('walletAddress').textContent = userAccount;
                 document.getElementById('network').textContent = 'PulseChain Mainnet';
                 document.getElementById('walletInfo').style.display = 'block';
                 
-                // Get data from multiple sources
                 await Promise.all([
                     getBalanceFromRPC(),
                     getBalanceFromBackupRPC(),
                     getBalanceFromExplorer(),
                     getAdditionalData(),
                     getTokenPortfolio(),
-                    getPulseXPositions(),
-                    getRecentActivity()
+                    getTransactionHistory()
                 ]);
                 
-                // Verify all sources match
                 verifyDataConsistency();
                 
             } catch (error) {
@@ -523,7 +613,6 @@
         
         async function getBalanceFromBackupRPC() {
             try {
-                // Create another Web3 instance with backup RPC
                 const backupWeb3 = new Web3('https://rpc.pulsechain.com');
                 const balanceWei = await backupWeb3.eth.getBalance(userAccount);
                 const balancePLS = backupWeb3.utils.fromWei(balanceWei, 'ether');
@@ -538,7 +627,6 @@
         
         async function getBalanceFromExplorer() {
             try {
-                // Try to get balance from block explorer API
                 const response = await fetch(`https://scan.pulsechain.com/api?module=account&action=balance&address=${userAccount}&tag=latest`);
                 const data = await response.json();
                 
@@ -550,7 +638,6 @@
                     throw new Error('Explorer API error');
                 }
             } catch (error) {
-                // Fallback display if explorer API fails
                 document.getElementById('balanceExplorer').textContent = 'API not available';
                 console.error('Explorer balance error:', error);
                 return null;
@@ -559,15 +646,12 @@
         
         async function getAdditionalData() {
             try {
-                // Transaction count
                 const txCount = await web3.eth.getTransactionCount(userAccount);
-                document.getElementById('txCount').textContent = txCount + ' transactions';
+                document.getElementById('txCount').textContent = txCount.toLocaleString() + ' transactions';
                 
-                // Latest block number
                 const blockNumber = await web3.eth.getBlockNumber();
                 document.getElementById('latestBlock').textContent = blockNumber.toLocaleString();
                 
-                // Current gas price
                 const gasPrice = await web3.eth.getGasPrice();
                 const gasPriceGwei = web3.utils.fromWei(gasPrice, 'gwei');
                 document.getElementById('gasPrice').textContent = parseFloat(gasPriceGwei).toFixed(2) + ' Gwei';
@@ -580,31 +664,6 @@
             }
         }
         
-        function verifyDataConsistency() {
-            const rpcBalance = document.getElementById('balanceRPC').textContent;
-            const backupBalance = document.getElementById('balanceBackup').textContent;
-            const explorerBalance = document.getElementById('balanceExplorer').textContent;
-            
-            const verificationDiv = document.getElementById('balanceMatch');
-            const statusSpan = document.getElementById('verificationStatus');
-            
-            // Check if balances match (allowing for small rounding differences)
-            const rpcValue = parseFloat(rpcBalance);
-            const backupValue = parseFloat(backupBalance);
-            
-            if (isNaN(rpcValue) || isNaN(backupValue)) {
-                verificationDiv.style.backgroundColor = '#ff6600';
-                statusSpan.textContent = 'Some sources failed to load';
-            } else if (Math.abs(rpcValue - backupValue) < 0.000001) {
-                verificationDiv.style.backgroundColor = '#44ff44';
-                verificationDiv.style.color = '#000';
-                statusSpan.textContent = '✅ All sources match - Data verified!';
-            } else {
-                verificationDiv.style.backgroundColor = '#ff4444';
-                statusSpan.textContent = '⚠️ Sources show different values - Check network';
-            }
-        }
-        
         async function getTokenPortfolio() {
             const portfolioDiv = document.getElementById('tokenPortfolio');
             portfolioDiv.innerHTML = '<div class="loading">Loading token balances...</div>';
@@ -613,13 +672,11 @@
                 const tokenBalances = [];
                 let totalValue = 0;
                 
-                // Check each common token
                 for (const token of COMMON_TOKENS) {
                     try {
                         const balance = await getTokenBalance(token.address, token.decimals);
                         if (balance > 0) {
-                            // Simulate price (in real app, you'd get from price API)
-                            const mockPrice = Math.random() * 100; // Mock price for demo
+                            const mockPrice = Math.random() * 100;
                             const value = balance * mockPrice;
                             
                             tokenBalances.push({
@@ -635,10 +692,9 @@
                     }
                 }
                 
-                // Add PLS balance to portfolio
                 const plsBalance = parseFloat(document.getElementById('balanceRPC').textContent);
                 if (!isNaN(plsBalance)) {
-                    const plsValue = plsBalance * 0.00001; // Mock PLS price
+                    const plsValue = plsBalance * 0.00001;
                     tokenBalances.unshift({
                         name: 'PulseChain',
                         symbol: 'PLS',
@@ -651,7 +707,6 @@
                 portfolioData.tokens = tokenBalances;
                 portfolioData.totalValue = totalValue;
                 
-                // Display portfolio
                 if (tokenBalances.length === 0) {
                     portfolioDiv.innerHTML = '<div style="text-align: center; color: #666;">No tokens found</div>';
                 } else {
@@ -661,7 +716,7 @@
                             <div class="token-item">
                                 <div>
                                     <div class="token-name">${token.name} (${token.symbol})</div>
-                                    <div class="token-value">~${token.value.toFixed(2)}</div>
+                                    <div class="token-value">~$${token.value.toFixed(2)}</div>
                                 </div>
                                 <div class="token-balance">
                                     <div>${token.balance.toFixed(6)}</div>
@@ -672,7 +727,7 @@
                     portfolioDiv.innerHTML = html;
                 }
                 
-                document.getElementById('totalValue').textContent = `~${totalValue.toFixed(2)}`;
+                document.getElementById('totalValue').textContent = `~$${totalValue.toFixed(2)}`;
                 
             } catch (error) {
                 portfolioDiv.innerHTML = '<div class="error">Failed to load token portfolio</div>';
@@ -682,7 +737,6 @@
         
         async function getTokenBalance(tokenAddress, decimals) {
             try {
-                // ERC-20 balanceOf function call
                 const contract = new web3.eth.Contract([{
                     "constant": true,
                     "inputs": [{"name": "_owner", "type": "address"}],
@@ -699,116 +753,259 @@
             }
         }
         
-        async function getPulseXPositions() {
-            const positionsDiv = document.getElementById('pulsexPositions');
-            positionsDiv.innerHTML = '<div class="loading">Loading PulseX positions...</div>';
+        async function getTransactionHistory() {
+            const historyDiv = document.getElementById('transactionHistory');
+            historyDiv.innerHTML = '<div class="loading">Loading transaction history...</div>';
             
             try {
-                // Mock PulseX positions for demo (in real app, query PulseX contracts)
-                const mockPositions = [
-                    {
-                        pair: 'PLS/PLSX',
-                        liquidityValue: Math.random() * 1000,
-                        token0: 'PLS',
-                        token1: 'PLSX',
-                        lpTokens: Math.random() * 100
-                    },
-                    {
-                        pair: 'HEX/PLS',
-                        liquidityValue: Math.random() * 500,
-                        token0: 'HEX',
-                        token1: 'PLS',
-                        lpTokens: Math.random() * 50
-                    }
-                ];
+                // Try PulseScan API first
+                let transactions = await getTransactionsFromAPI();
                 
-                portfolioData.pulsexPositions = mockPositions;
-                
-                if (mockPositions.length === 0) {
-                    positionsDiv.innerHTML = '<div style="text-align: center; color: #666;">No PulseX positions found</div>';
-                } else {
-                    let html = '';
-                    mockPositions.forEach(position => {
-                        html += `
-                            <div class="pulsex-position">
-                                <div class="position-header">
-                                    <div class="pair-name">${position.pair}</div>
-                                    <div class="position-value">~${position.liquidityValue.toFixed(2)}</div>
-                                </div>
-                                <div style="font-size: 14px; color: #ccc;">
-                                    LP Tokens: ${position.lpTokens.toFixed(6)}
-                                </div>
-                            </div>
-                        `;
-                    });
-                    positionsDiv.innerHTML = html;
+                if (transactions.length === 0) {
+                    // Fallback to blockchain scanning if API fails
+                    transactions = await getTransactionsFromBlockchain();
                 }
                 
+                portfolioData.transactions = transactions;
+                portfolioData.currentPage = 1;
+                
+                displayTransactions();
+                
             } catch (error) {
-                positionsDiv.innerHTML = '<div class="error">Failed to load PulseX positions</div>';
-                console.error('PulseX positions error:', error);
+                historyDiv.innerHTML = '<div class="error">Failed to load transaction history</div>';
+                console.error('Transaction history error:', error);
             }
         }
         
-        async function getRecentActivity() {
-            const activityDiv = document.getElementById('recentActivity');
-            activityDiv.innerHTML = '<div class="loading">Loading recent transactions...</div>';
-            
+        async function getTransactionsFromAPI() {
             try {
-                // Get recent transactions from blockchain
-                const latestBlock = await web3.eth.getBlockNumber();
-                const transactions = [];
+                const response = await fetch(
+                    `https://scan.pulsechain.com/api?module=account&action=txlist&address=${userAccount}&startblock=0&endblock=99999999&page=1&offset=100&sort=desc`
+                );
+                const data = await response.json();
                 
-                // Check last 5 blocks for user transactions (simplified)
-                for (let i = 0; i < 5; i++) {
+                if (data.status === '1' && data.result) {
+                    return data.result.map(tx => ({
+                        hash: tx.hash,
+                        from: tx.from,
+                        to: tx.to,
+                        value: parseFloat(web3.utils.fromWei(tx.value, 'ether')),
+                        timestamp: new Date(parseInt(tx.timeStamp) * 1000),
+                        blockNumber: parseInt(tx.blockNumber),
+                        gasPrice: tx.gasPrice,
+                        gasUsed: tx.gasUsed,
+                        isError: tx.isError === '1',
+                        type: determineTransactionType(tx, userAccount)
+                    }));
+                }
+                return [];
+            } catch (error) {
+                console.error('API transaction fetch error:', error);
+                return [];
+            }
+        }
+        
+        async function getTransactionsFromBlockchain() {
+            try {
+                const transactions = [];
+                const latestBlock = await web3.eth.getBlockNumber();
+                const maxBlocks = 50; // Limit to prevent rate limiting
+                
+                for (let i = 0; i < maxBlocks; i++) {
                     try {
                         const block = await web3.eth.getBlock(latestBlock - i, true);
                         if (block && block.transactions) {
-                            block.transactions.forEach(tx => {
-                                if (tx.from && tx.from.toLowerCase() === userAccount.toLowerCase()) {
+                            for (const tx of block.transactions) {
+                                if (tx.from && (
+                                    tx.from.toLowerCase() === userAccount.toLowerCase() ||
+                                    (tx.to && tx.to.toLowerCase() === userAccount.toLowerCase())
+                                )) {
                                     transactions.push({
                                         hash: tx.hash,
-                                        type: tx.to ? 'Transfer' : 'Contract',
-                                        block: block.number,
-                                        timestamp: new Date(block.timestamp * 1000)
+                                        from: tx.from,
+                                        to: tx.to,
+                                        value: parseFloat(web3.utils.fromWei(tx.value, 'ether')),
+                                        timestamp: new Date(block.timestamp * 1000),
+                                        blockNumber: block.number,
+                                        gasPrice: tx.gasPrice,
+                                        type: determineTransactionType(tx, userAccount)
                                     });
                                 }
-                            });
+                            }
                         }
+                        
+                        if (transactions.length >= 100) break;
                     } catch (error) {
                         console.error('Block fetch error:', error);
                     }
                 }
                 
-                portfolioData.recentTransactions = transactions;
-                
-                if (transactions.length === 0) {
-                    activityDiv.innerHTML = '<div style="text-align: center; color: #666;">No recent activity found</div>';
-                } else {
-                    let html = '';
-                    transactions.slice(0, 5).forEach(tx => {
-                        html += `
-                            <div class="transaction-item">
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <div class="tx-type">${tx.type}</div>
-                                    <div style="font-size: 12px; color: #999;">
-                                        Block ${tx.block}
-                                    </div>
-                                </div>
-                                <div class="tx-hash">${tx.hash}</div>
-                                <div style="font-size: 12px; color: #999; margin-top: 5px;">
-                                    ${tx.timestamp.toLocaleString()}
-                                </div>
-                            </div>
-                        `;
-                    });
-                    activityDiv.innerHTML = html;
-                }
-                
+                return transactions.sort((a, b) => b.timestamp - a.timestamp).slice(0, 100);
             } catch (error) {
-                activityDiv.innerHTML = '<div class="error">Failed to load recent activity</div>';
-                console.error('Recent activity error:', error);
+                console.error('Blockchain transaction fetch error:', error);
+                return [];
             }
+        }
+        
+        function determineTransactionType(tx, userAddress) {
+            if (!tx.to) return 'contract';
+            if (tx.from.toLowerCase() === userAddress.toLowerCase()) return 'sent';
+            if (tx.to.toLowerCase() === userAddress.toLowerCase()) return 'received';
+            return 'contract';
+        }
+        
+        function displayTransactions() {
+            const historyDiv = document.getElementById('transactionHistory');
+            const paginationDiv = document.getElementById('txPagination');
+            
+            if (portfolioData.transactions.length === 0) {
+                historyDiv.innerHTML = '<div style="text-align: center; color: #666;">No transactions found</div>';
+                paginationDiv.style.display = 'none';
+                return;
+            }
+            
+            // Filter transactions
+            let filteredTxs = portfolioData.transactions;
+            if (portfolioData.currentFilter !== 'all') {
+                filteredTxs = portfolioData.transactions.filter(tx => tx.type === portfolioData.currentFilter);
+            }
+            
+            // Pagination
+            const totalPages = Math.ceil(filteredTxs.length / portfolioData.itemsPerPage);
+            const startIndex = (portfolioData.currentPage - 1) * portfolioData.itemsPerPage;
+            const endIndex = startIndex + portfolioData.itemsPerPage;
+            const currentTxs = filteredTxs.slice(startIndex, endIndex);
+            
+            // Display transactions
+            let html = '';
+            currentTxs.forEach(tx => {
+                const typeClass = `tx-${tx.type}`;
+                const typeIcon = tx.type === 'sent' ? '📤' : tx.type === 'received' ? '📥' : '🔄';
+                const typeText = tx.type.charAt(0).toUpperCase() + tx.type.slice(1);
+                
+                html += `
+                    <div class="transaction-item ${typeClass}">
+                        <div class="tx-header">
+                            <div>
+                                <span class="tx-type ${typeClass}">${typeIcon} ${typeText}</span>
+                                <span class="tx-amount">${tx.value > 0 ? tx.value.toFixed(6) + ' PLS' : 'Contract Interaction'}</span>
+                            </div>
+                            <div style="font-size: 12px; color: #999;">
+                                ${tx.timestamp.toLocaleDateString()} ${tx.timestamp.toLocaleTimeString()}
+                            </div>
+                        </div>
+                        <div class="tx-details">
+                            <div style="margin-bottom: 5px;">
+                                ${tx.type === 'sent' ? 'To: ' : tx.type === 'received' ? 'From: ' : 'Contract: '}
+                                <span style="font-family: monospace; color: #00d4ff;">
+                                    ${tx.type === 'sent' ? tx.to : tx.from}
+                                </span>
+                            </div>
+                            <div class="tx-hash" onclick="openTransaction('${tx.hash}')">
+                                ${tx.hash}
+                            </div>
+                            <div style="margin-top: 5px; font-size: 12px;">
+                                Block: ${tx.blockNumber ? tx.blockNumber.toLocaleString() : 'Pending'}
+                                ${tx.isError ? ' • ❌ Failed' : ' • ✅ Success'}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            historyDiv.innerHTML = html;
+            
+            // Update pagination
+            if (totalPages > 1) {
+                document.getElementById('pageInfo').textContent = `Page ${portfolioData.currentPage} of ${totalPages} (${filteredTxs.length} transactions)`;
+                paginationDiv.style.display = 'flex';
+            } else {
+                paginationDiv.style.display = 'none';
+            }
+        }
+        
+        function filterTransactions(filter) {
+            portfolioData.currentFilter = filter;
+            portfolioData.currentPage = 1;
+            
+            // Update filter button styles
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            displayTransactions();
+        }
+        
+        function changePage(direction) {
+            const filteredTxs = portfolioData.currentFilter === 'all' 
+                ? portfolioData.transactions 
+                : portfolioData.transactions.filter(tx => tx.type === portfolioData.currentFilter);
+            
+            const totalPages = Math.ceil(filteredTxs.length / portfolioData.itemsPerPage);
+            
+            portfolioData.currentPage += direction;
+            
+            if (portfolioData.currentPage < 1) portfolioData.currentPage = 1;
+            if (portfolioData.currentPage > totalPages) portfolioData.currentPage = totalPages;
+            
+            displayTransactions();
+        }
+        
+        function openTransaction(hash) {
+            window.open(`https://scan.pulsechain.com/tx/${hash}`, '_blank');
+        }
+        
+        function verifyDataConsistency() {
+            const rpcBalance = document.getElementById('balanceRPC').textContent;
+            const backupBalance = document.getElementById('balanceBackup').textContent;
+            
+            const verificationDiv = document.getElementById('balanceMatch');
+            const statusSpan = document.getElementById('verificationStatus');
+            
+            const rpcValue = parseFloat(rpcBalance);
+            const backupValue = parseFloat(backupBalance);
+            
+            if (isNaN(rpcValue) || isNaN(backupValue)) {
+                verificationDiv.style.backgroundColor = '#ff6600';
+                statusSpan.textContent = 'Some sources failed to load';
+            } else if (Math.abs(rpcValue - backupValue) < 0.000001) {
+                verificationDiv.style.backgroundColor = '#44ff44';
+                verificationDiv.style.color = '#000';
+                statusSpan.textContent = '✅ All sources match - Data verified!';
+            } else {
+                verificationDiv.style.backgroundColor = '#ff4444';
+                statusSpan.textContent = '⚠️ Sources show different values - Check network';
+            }
+        }
+        
+        function disconnectWallet() {
+            userAccount = null;
+            web3 = null;
+            
+            document.getElementById('status').className = 'status disconnected';
+            document.getElementById('status').textContent = 'Not Connected to PulseChain';
+            document.getElementById('connectBtn').style.display = 'inline-block';
+            document.getElementById('disconnectBtn').style.display = 'none';
+            document.getElementById('disconnectBtn').textContent = 'Disconnect';
+            document.getElementById('walletInfo').style.display = 'none';
+            document.getElementById('walletInput').value = '';
+            hideError();
+        }
+        
+        function showConnected() {
+            document.getElementById('status').className = 'status connected';
+            document.getElementById('status').textContent = '✅ Connected to PulseChain';
+            document.getElementById('connectBtn').style.display = 'none';
+            document.getElementById('disconnectBtn').style.display = 'inline-block';
+        }
+        
+        function showAnalyzed() {
+            document.getElementById('status').className = 'status connected';
+            document.getElementById('status').textContent = '🔍 Wallet Analysis Complete';
+            document.getElementById('connectBtn').style.display = 'none';
+            document.getElementById('disconnectBtn').style.display = 'inline-block';
+            document.getElementById('disconnectBtn').textContent = 'Clear Analysis';
         }
         
         async function refreshData() {
@@ -842,11 +1039,12 @@
             });
             
             exportText += `
-## PulseX Positions
+## Recent Transactions (Last ${Math.min(portfolioData.transactions.length, 10)})
 `;
             
-            portfolioData.pulsexPositions.forEach(position => {
-                exportText += `- ${position.pair}: ${position.lpTokens.toFixed(6)} LP (~${position.liquidityValue.toFixed(2)})\n`;
+            portfolioData.transactions.slice(0, 10).forEach(tx => {
+                const typeIcon = tx.type === 'sent' ? '📤' : tx.type === 'received' ? '📥' : '🔄';
+                exportText += `${typeIcon} ${tx.type.toUpperCase()}: ${tx.value.toFixed(6)} PLS - ${tx.timestamp.toLocaleDateString()}\n`;
             });
             
             content.innerHTML = `<pre style="white-space: pre-wrap; background: #1a1a1a; padding: 15px; border-radius: 8px; max-height: 400px; overflow-y: auto;">${exportText}</pre>`;
@@ -854,7 +1052,7 @@
         }
         
         function shareSummary() {
-            const shareText = `Check out my PulseChain portfolio: ${portfolioData.tokens.length} tokens, ~${portfolioData.totalValue.toFixed(2)} total value. Tested with PulseChain Wallet Tester!`;
+            const shareText = `Check out my PulseChain portfolio: ${portfolioData.tokens.length} tokens, ${portfolioData.transactions.length} transactions, ~${portfolioData.totalValue.toFixed(2)} total value. Analyzed with PulseChain Wallet Tester!`;
             
             if (navigator.share) {
                 navigator.share({
@@ -863,7 +1061,6 @@
                     url: window.location.href
                 });
             } else {
-                // Fallback to clipboard
                 navigator.clipboard.writeText(shareText + '\n\n' + window.location.href);
                 alert('Portfolio summary copied to clipboard!');
             }
@@ -880,7 +1077,6 @@
         }
         
         function downloadPDF() {
-            // Simple PDF download (in real app, use a proper PDF library)
             const content = document.getElementById('exportContent').textContent;
             const blob = new Blob([content], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
@@ -889,68 +1085,6 @@
             a.download = 'pulsechain-portfolio-summary.txt';
             a.click();
             URL.revokeObjectURL(url);
-        }
-        
-        function disconnectWallet() {
-            userAccount = null;
-            web3 = null;
-            
-            document.getElementById('status').className = 'status disconnected';
-            document.getElementById('status').textContent = 'Not Connected to PulseChain';
-            document.getElementById('connectBtn').style.display = 'inline-block';
-            document.getElementById('disconnectBtn').style.display = 'none';
-            document.getElementById('disconnectBtn').textContent = 'Disconnect';
-            document.getElementById('walletInfo').style.display = 'none';
-            document.getElementById('walletInput').value = '';
-            hideError();
-        }
-        
-        function showConnected() {
-            document.getElementById('status').className = 'status connected';
-            document.getElementById('status').textContent = '✅ Connected to PulseChain';
-            document.getElementById('connectBtn').style.display = 'none';
-            document.getElementById('disconnectBtn').style.display = 'inline-block';
-        }
-        
-        async function analyzeWallet() {
-            const inputAddress = document.getElementById('walletInput').value.trim();
-            
-            if (!inputAddress) {
-                showError('Please enter a wallet address');
-                return;
-            }
-            
-            if (!inputAddress.startsWith('0x') || inputAddress.length !== 42) {
-                showError('Please enter a valid wallet address (starts with 0x, 42 characters)');
-                return;
-            }
-            
-            showLoading(true);
-            hideError();
-            
-            try {
-                // Set up Web3 connection without wallet
-                web3 = new Web3('https://rpc.pulsechain.com');
-                userAccount = inputAddress;
-                
-                // Update wallet info
-                await updateWalletInfo();
-                showAnalyzed();
-                
-            } catch (error) {
-                console.error('Analysis error:', error);
-                showError('Failed to analyze wallet: ' + error.message);
-            }
-            
-            showLoading(false);
-        }
-        
-        function showAnalyzed() {
-            document.getElementById('status').className = 'status connected';
-            document.getElementById('status').textContent = '🔍 Wallet Analysis Complete';
-            document.getElementById('connectBtn').style.display = 'none';
-            document.getElementById('disconnectBtn').style.display = 'inline-block';
-            document.getElementById('disconnectBtn').textContent = 'Clear Analysis';
         }
         
         function showLoading(show) {
