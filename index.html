@@ -763,48 +763,70 @@
             try {
                 const transactions = [];
                 const latestBlock = await web3.eth.getBlockNumber();
-                const maxBlocks = 100; // Scan more blocks for better results
+                const maxBlocks = 50; // Reduced for better performance
+                
+                console.log(`Scanning last ${maxBlocks} blocks for transactions...`);
                 
                 for (let i = 0; i < maxBlocks; i++) {
                     try {
                         const blockNumber = latestBlock - i;
                         const block = await web3.eth.getBlock(blockNumber, true);
                         
-                        if (block && block.transactions) {
+                        if (block && block.transactions && block.transactions.length > 0) {
                             for (const tx of block.transactions) {
-                                if (tx.from && (
-                                    tx.from.toLowerCase() === userAccount.toLowerCase() ||
-                                    (tx.to && tx.to.toLowerCase() === userAccount.toLowerCase())
-                                )) {
+                                // Check if transaction involves our wallet
+                                const isFromWallet = tx.from && tx.from.toLowerCase() === userAccount.toLowerCase();
+                                const isToWallet = tx.to && tx.to.toLowerCase() === userAccount.toLowerCase();
+                                
+                                if (isFromWallet || isToWallet) {
+                                    // Safely handle BigInt values
+                                    let txValue = 0;
+                                    try {
+                                        if (tx.value && tx.value !== '0x0') {
+                                            txValue = parseFloat(web3.utils.fromWei(tx.value.toString(), 'ether'));
+                                        }
+                                    } catch (valueError) {
+                                        console.log('Value conversion error:', valueError);
+                                        txValue = 0;
+                                    }
+                                    
                                     transactions.push({
                                         hash: tx.hash,
-                                        from: tx.from,
+                                        from: tx.from || 'Unknown',
                                         to: tx.to || 'Contract Creation',
-                                        value: parseFloat(web3.utils.fromWei(tx.value.toString(), 'ether')),
+                                        value: txValue,
                                         timestamp: new Date(Number(block.timestamp) * 1000),
                                         blockNumber: Number(block.number),
-                                        gasPrice: tx.gasPrice ? Number(tx.gasPrice) : 0,
-                                        isError: false, // We only get successful transactions this way
-                                        type: determineTransactionType(tx, userAccount)
+                                        gasPrice: 0, // Skip gas price to avoid BigInt issues
+                                        isError: false,
+                                        type: isFromWallet ? 'sent' : 'received'
                                     });
+                                    
+                                    console.log(`Found transaction: ${tx.hash.substring(0, 10)}...`);
                                 }
                             }
                         }
                         
                         // Stop if we have enough transactions
-                        if (transactions.length >= 50) break;
-                        
-                        // Add small delay to prevent rate limiting
-                        if (i % 10 === 0) {
-                            await new Promise(resolve => setTimeout(resolve, 100));
+                        if (transactions.length >= 20) {
+                            console.log(`Found ${transactions.length} transactions, stopping scan.`);
+                            break;
                         }
-                    } catch (error) {
-                        console.error(`Block ${latestBlock - i} fetch error:`, error);
+                        
+                        // Add delay every 5 blocks to prevent rate limiting
+                        if (i % 5 === 0 && i > 0) {
+                            await new Promise(resolve => setTimeout(resolve, 200));
+                        }
+                        
+                    } catch (blockError) {
+                        console.log(`Error scanning block ${latestBlock - i}:`, blockError.message);
                         continue; // Skip this block and continue
                     }
                 }
                 
+                console.log(`Transaction scan complete. Found ${transactions.length} transactions.`);
                 return transactions.sort((a, b) => b.timestamp - a.timestamp);
+                
             } catch (error) {
                 console.error('Blockchain transaction fetch error:', error);
                 return [];
